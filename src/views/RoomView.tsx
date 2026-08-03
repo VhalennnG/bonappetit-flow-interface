@@ -11,6 +11,7 @@ import {
   FaEyeSlash,
   FaCopy,
 } from "react-icons/fa";
+import logoImg from "../assets/logo.png";
 
 interface RoomViewProps {
   roomId: string;
@@ -247,56 +248,59 @@ export const RoomView: React.FC<RoomViewProps> = ({
           gap: "1rem",
         }}
       >
-        <div>
-          <span
-            style={{
-              fontSize: "0.8rem",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              color: "rgba(45,38,33,0.5)",
-            }}
-          >
-            Active in
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <h2
-              style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800 }}
-              className="text-gradient"
-            >
-              {showRoomId ? roomId : "••••••••"}
-            </h2>
-            <button
-              onClick={() => setShowRoomId(!showRoomId)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <img src={logoImg} alt="Logo" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
+          <div>
+            <span
               style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: "#78716c",
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "0.2rem",
-                fontSize: "0.9rem",
+                fontSize: "0.8rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                color: "rgba(45,38,33,0.5)",
               }}
-              title={showRoomId ? "Hide Room ID" : "Show Room ID"}
             >
-              {showRoomId ? <FaEyeSlash /> : <FaEye />}
-            </button>
-            <button
-              onClick={() => copyToClipboard(roomId, "Room ID")}
-              style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: "#78716c",
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "0.2rem",
-                fontSize: "0.9rem",
-              }}
-              title="Copy Room ID"
-            >
-              <FaCopy />
-            </button>
+              Active in
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <h2
+                style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800 }}
+                className="text-gradient"
+              >
+                {showRoomId ? roomId : "••••••••"}
+              </h2>
+              <button
+                onClick={() => setShowRoomId(!showRoomId)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#78716c",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "0.2rem",
+                  fontSize: "0.9rem",
+                }}
+                title={showRoomId ? "Hide Room ID" : "Show Room ID"}
+              >
+                {showRoomId ? <FaEyeSlash /> : <FaEye />}
+              </button>
+              <button
+                onClick={() => copyToClipboard(roomId, "Room ID")}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#78716c",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "0.2rem",
+                  fontSize: "0.9rem",
+                }}
+                title="Copy Room ID"
+              >
+                <FaCopy />
+              </button>
+            </div>
           </div>
         </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FaUtensils, FaDoorOpen, FaKey } from "react-icons/fa";
+import { FaDoorOpen, FaKey } from "react-icons/fa";
+import logoImg from "../assets/logo.png";
 
 interface HomeViewProps {
   addToast: (message: string) => void;
@@ -7,8 +8,8 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
-  const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
-  
+  const [activeTab, setActiveTab] = useState<"create" | "join">("create");
+
   // Create Room state
   const [createSecretKey, setCreateSecretKey] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
@@ -50,12 +51,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
 
       addToast("Room created successfully!");
       if (data.replacedRoomId) {
-        addToast(`Old room ${data.replacedRoomId} was deleted automatically (device limit)`);
+        addToast(
+          `Old room ${data.replacedRoomId} was deleted automatically (device limit)`,
+        );
       }
 
       onJoinRoom(data.roomId, createSecretKey);
     } catch (err) {
-      addToast("Connection failed. Make sure the C++ backend server is running.");
+      addToast(
+        "Connection failed. Make sure the C++ backend server is running.",
+      );
       console.error(err);
     } finally {
       setCreateLoading(false);
@@ -82,7 +87,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
         method: "GET",
         headers: {
           "X-Device-Key": cleanSecretKey,
-        }
+        },
       });
 
       const data = await response.json();
@@ -102,7 +107,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
       addToast("Successfully joined the room!");
       onJoinRoom(cleanRoomId, cleanSecretKey);
     } catch (err) {
-      addToast("Connection failed. Make sure the C++ backend server is running.");
+      addToast(
+        "Connection failed. Make sure the C++ backend server is running.",
+      );
       console.error(err);
     } finally {
       setJoinLoading(false);
@@ -122,14 +129,27 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
       <div
         className="glass-panel"
         style={{
-          padding: "2.5rem 3rem 3rem 3rem",
+          padding: "2.5rem 2rem 2.5rem 2rem",
           maxWidth: "480px",
           width: "100%",
           textAlign: "center",
-          background: '#ffffff',
-          boxShadow: '0 20px 45px rgba(139, 115, 91, 0.12)'
+          background: "#ffffff",
+          boxShadow: "0 20px 45px rgba(139, 115, 91, 0.12)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
+        <img
+          src={logoImg}
+          alt="Bon appétit Logo"
+          style={{
+            height: "80px",
+            width: "auto",
+            marginBottom: "1.25rem",
+            objectFit: "contain",
+          }}
+        />
         <h1
           style={{
             fontSize: "2.3rem",
@@ -139,62 +159,85 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
             alignItems: "center",
             justifyContent: "center",
             gap: "0.5rem",
-            color: '#431a03'
+            color: "#431a03",
+            width: "100%",
           }}
         >
-          Bon appétit <span className="text-gradient">Flow</span>{" "}
-          <FaUtensils style={{ color: "#ea580c", fontSize: "2rem" }} />
+          Bon appétit <span className="text-gradient">Flow</span>
         </h1>
-        <p style={{ color: "rgba(45,38,33,0.5)", marginBottom: '2rem', fontSize: '0.9rem' }}>
+        <p
+          style={{
+            color: "rgba(45,38,33,0.5)",
+            marginBottom: "2rem",
+            fontSize: "0.9rem",
+            width: "100%",
+          }}
+        >
           Real-time Restaurant Queue & Order Processing System
         </p>
 
         {/* Chrome-style Tab Navigation Bar */}
-        <div style={{ display: 'flex', borderBottom: '2px solid #f3e5d3', marginBottom: '2rem', gap: '0.25rem' }}>
+        <div
+          style={{
+            display: "flex",
+            borderBottom: "2px solid #f3e5d3",
+            marginBottom: "2rem",
+            gap: "0.25rem",
+            width: "100%",
+          }}
+        >
           <button
-            onClick={() => setActiveTab('create')}
+            onClick={() => setActiveTab("create")}
             style={{
               flex: 1,
-              padding: '0.75rem',
-              border: 'none',
-              background: activeTab === 'create' ? '#ffffff' : 'rgba(243, 229, 211, 0.25)',
-              borderTopLeftRadius: '10px',
-              borderTopRightRadius: '10px',
+              padding: "0.6rem 0.5rem",
+              border: "none",
+              background:
+                activeTab === "create"
+                  ? "#ffffff"
+                  : "rgba(243, 229, 211, 0.25)",
+              borderTopLeftRadius: "10px",
+              borderTopRightRadius: "10px",
               fontWeight: 700,
-              fontSize: '0.9rem',
-              color: activeTab === 'create' ? '#ea580c' : '#78716c',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'create' ? '2.5px solid #ea580c' : 'none',
-              transform: activeTab === 'create' ? 'translateY(2px)' : 'none',
-              transition: 'all 0.15s ease-in-out'
+              fontSize: "0.85rem",
+              color: activeTab === "create" ? "#ea580c" : "#78716c",
+              cursor: "pointer",
+              borderBottom:
+                activeTab === "create" ? "2.5px solid #ea580c" : "none",
+              transform: activeTab === "create" ? "translateY(2px)" : "none",
+              transition: "all 0.15s ease-in-out",
+              whiteSpace: "nowrap",
             }}
           >
-            <FaDoorOpen style={{ marginRight: '0.25rem' }} /> Create Room
+            <FaDoorOpen style={{ marginRight: "0.25rem" }} /> Create Room
           </button>
           <button
-            onClick={() => setActiveTab('join')}
+            onClick={() => setActiveTab("join")}
             style={{
               flex: 1,
-              padding: '0.75rem',
-              border: 'none',
-              background: activeTab === 'join' ? '#ffffff' : 'rgba(243, 229, 211, 0.25)',
-              borderTopLeftRadius: '10px',
-              borderTopRightRadius: '10px',
+              padding: "0.6rem 0.5rem",
+              border: "none",
+              background:
+                activeTab === "join" ? "#ffffff" : "rgba(243, 229, 211, 0.25)",
+              borderTopLeftRadius: "10px",
+              borderTopRightRadius: "10px",
               fontWeight: 700,
-              fontSize: '0.9rem',
-              color: activeTab === 'join' ? '#ea580c' : '#78716c',
-              cursor: 'pointer',
-              borderBottom: activeTab === 'join' ? '2.5px solid #ea580c' : 'none',
-              transform: activeTab === 'join' ? 'translateY(2px)' : 'none',
-              transition: 'all 0.15s ease-in-out'
+              fontSize: "0.85rem",
+              color: activeTab === "join" ? "#ea580c" : "#78716c",
+              cursor: "pointer",
+              borderBottom:
+                activeTab === "join" ? "2.5px solid #ea580c" : "none",
+              transform: activeTab === "join" ? "translateY(2px)" : "none",
+              transition: "all 0.15s ease-in-out",
+              whiteSpace: "nowrap",
             }}
           >
-            <FaKey style={{ marginRight: '0.25rem' }} /> Join Room
+            <FaKey style={{ marginRight: "0.25rem" }} /> Join Room
           </button>
         </div>
 
         {/* Tab Contents */}
-        {activeTab === 'create' ? (
+        {activeTab === "create" ? (
           <form
             onSubmit={handleCreateRoom}
             style={{
@@ -202,10 +245,23 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
               flexDirection: "column",
               gap: "1.25rem",
               textAlign: "left",
+              width: "100%",
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#431a03" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.4rem",
+              }}
+            >
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  color: "#431a03",
+                }}
+              >
                 Room Secret Key (min. 6 characters)
               </label>
               <input
@@ -214,7 +270,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
                 value={createSecretKey}
                 onChange={(e) => setCreateSecretKey(e.target.value)}
                 placeholder="Enter secret key..."
-                style={{ padding: '0.6rem' }}
+                style={{ padding: "0.6rem" }}
                 required
               />
             </div>
@@ -222,7 +278,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
             <button
               type="submit"
               className="btn-primary"
-              style={{ padding: "0.85rem", fontSize: "1rem", marginTop: "0.75rem" }}
+              style={{
+                padding: "0.85rem",
+                fontSize: "1rem",
+                marginTop: "0.75rem",
+              }}
               disabled={createLoading}
             >
               {createLoading ? "Creating Room..." : "Create New Room"}
@@ -236,10 +296,23 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
               flexDirection: "column",
               gap: "1.25rem",
               textAlign: "left",
+              width: "100%",
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#431a03" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.4rem",
+              }}
+            >
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  color: "#431a03",
+                }}
+              >
                 Room ID
               </label>
               <input
@@ -248,13 +321,25 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
                 value={joinRoomId}
                 onChange={(e) => setJoinRoomId(e.target.value)}
                 placeholder="room_xxxxxx"
-                style={{ padding: '0.6rem' }}
+                style={{ padding: "0.6rem" }}
                 required
               />
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <label style={{ fontSize: "0.85rem", fontWeight: 700, color: "#431a03" }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.4rem",
+              }}
+            >
+              <label
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  color: "#431a03",
+                }}
+              >
                 Secret Key
               </label>
               <input
@@ -263,7 +348,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
                 value={joinSecretKey}
                 onChange={(e) => setJoinSecretKey(e.target.value)}
                 placeholder="sec_xxxxxx"
-                style={{ padding: '0.6rem' }}
+                style={{ padding: "0.6rem" }}
                 required
               />
             </div>
@@ -271,7 +356,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
             <button
               type="submit"
               className="btn-primary"
-              style={{ padding: "0.85rem", fontSize: "1rem", marginTop: "0.75rem" }}
+              style={{
+                padding: "0.85rem",
+                fontSize: "1rem",
+                marginTop: "0.75rem",
+              }}
               disabled={joinLoading}
             >
               {joinLoading ? "Authenticating..." : "Join Room"}
