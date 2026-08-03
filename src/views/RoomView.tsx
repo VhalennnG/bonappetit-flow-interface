@@ -4,35 +4,49 @@ import { CulinaryFlowSystem } from "../components/CulinaryFlowSystem";
 import {
   FaShoppingCart,
   FaUtensils,
-  FaUsers,
-  FaRegFileAlt,
   FaTimes,
   FaFire,
   FaCheck,
-  FaClock,
-  FaCog,
+  FaEye,
+  FaEyeSlash,
+  FaCopy,
 } from "react-icons/fa";
 
 interface RoomViewProps {
   roomId: string;
   addToast: (message: string) => void;
+  onExit: () => void;
 }
 
 const PRESETS = [
-  "Nasi Goreng",
-  "Mie Goreng",
-  "Ayam Bakar",
-  "Es Teh",
-  "Es Jeruk",
+  "Fried Rice",
+  "Fried Noodles",
+  "Grilled Chicken",
+  "Iced Tea",
+  "Orange Juice",
 ];
 
-export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
-  const [activeTab, setActiveTab] = useState<"kasir" | "dapur" | "pelanggan">(
-    "kasir",
-  );
+export const RoomView: React.FC<RoomViewProps> = ({
+  roomId,
+  addToast,
+  onExit,
+}) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [expiresAt, setExpiresAt] = useState<string>("");
+
+  // Room details visibility masking
+  const [showRoomId, setShowRoomId] = useState<boolean>(false);
+  const [showSecretKey, setShowSecretKey] = useState<boolean>(false);
+
+  // Clipboard copy helper
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    addToast(`${label} copied successfully!`);
+  };
+
+  // Modal toggle
+  const [showCashierModal, setShowCashierModal] = useState<boolean>(false);
 
   // Cashier form state
   const [tableNumber, setTableNumber] = useState<number>(1);
@@ -46,19 +60,29 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
   // 1. Verify Room and fetch orders
   const fetchRoomAndOrders = async () => {
     try {
-      // Check room status
-      const roomRes = await fetch(`/rooms/${roomId}`);
+      const roomRes = await fetch(`/rooms/${roomId}`, {
+        headers: {
+          "X-Device-Key": secretKey,
+        },
+      });
+      if (roomRes.status === 401) {
+        addToast("Access denied! Invalid secret key.");
+        onExit();
+        return;
+      }
       if (!roomRes.ok) {
-        addToast("Room tidak ditemukan atau sudah kedaluwarsa!");
-        sessionStorage.clear();
-        window.location.hash = "#home";
+        addToast("Room not found or expired!");
+        onExit();
         return;
       }
       const roomData = await roomRes.json();
       setExpiresAt(roomData.expiresAt);
 
-      // Fetch active orders
-      const ordersRes = await fetch(`/rooms/${roomId}/orders`);
+      const ordersRes = await fetch(`/rooms/${roomId}/orders`, {
+        headers: {
+          "X-Device-Key": secretKey,
+        },
+      });
       if (ordersRes.ok) {
         const ordersData = await ordersRes.json();
         setOrders(ordersData.orders || []);
@@ -70,7 +94,6 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
 
   useEffect(() => {
     fetchRoomAndOrders();
-    // 3-second active polling
     const interval = setInterval(fetchRoomAndOrders, 3000);
     return () => clearInterval(interval);
   }, [roomId]);
@@ -83,9 +106,8 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
       const difference = +new Date(expiresAt) - +new Date();
       if (difference <= 0) {
         setTimeLeft("Expired");
-        addToast("Masa berlaku room telah berakhir!");
-        sessionStorage.clear();
-        window.location.hash = "#home";
+        addToast("The room validity has expired!");
+        onExit();
         return;
       }
 
@@ -105,7 +127,7 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
     return () => clearInterval(timer);
   }, [expiresAt]);
 
-  // 3. Add item to current cashier order
+  // 3. Cashier Actions
   const addItemToOrder = (name: string, quantity: number, notes: string) => {
     setOrderItems((prev) => {
       const existing = prev.find((item) => item.name === name);
@@ -122,7 +144,7 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
       }
       return [...prev, { name, quantity, notes }];
     });
-    addToast(`Ditambahkan: ${name} (x${quantity})`);
+    addToast(`Added: ${name} (x${quantity})`);
   };
 
   const handleAddCustomItem = (e: React.FormEvent) => {
@@ -138,10 +160,9 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
     setOrderItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 4. Submit Order (Cashier Action)
   const handleSubmitOrder = async () => {
     if (orderItems.length === 0) {
-      addToast("Pilih minimal 1 menu sebelum mengirim pesanan!");
+      addToast("Select at least 1 item before sending the order!");
       return;
     }
 
@@ -160,22 +181,23 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
 
       const data = await response.json();
       if (!response.ok) {
-        addToast(data.message || "Gagal membuat pesanan");
+        addToast(data.message || "Failed to create order");
         return;
       }
 
       addToast(
-        `Pesanan #${data.orderId} untuk Meja ${tableNumber} sukses dikirim!`,
+        `Order #${data.orderId} for Table ${tableNumber} successfully sent!`,
       );
       setOrderItems([]);
+      setShowCashierModal(false); // Close modal on success
       fetchRoomAndOrders(); // refresh immediately
     } catch (err) {
-      addToast("Gagal terhubung ke server untuk membuat pesanan.");
+      addToast("Failed to connect to server to create order.");
       console.error(err);
     }
   };
 
-  // 5. Transition Order Status (Kitchen Action)
+  // 4. Kitchen Actions
   const handleUpdateStatus = async (
     orderId: string,
     currentStatus: OrderStatus,
@@ -195,30 +217,29 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
 
       const data = await response.json();
       if (!response.ok) {
-        addToast(data.message || "Gagal mengubah status pesanan");
+        addToast(data.message || "Failed to update order status");
         return;
       }
 
-      addToast(`Pesanan #${orderId} kini berstatus: ${nextStatus}`);
+      addToast(`Order #${orderId} is now: ${nextStatus}`);
       fetchRoomAndOrders(); // refresh immediately
     } catch (err) {
-      addToast("Gagal memperbarui status pesanan.");
+      addToast("Failed to update order status.");
       console.error(err);
     }
   };
 
   const handleExitRoom = () => {
-    sessionStorage.clear();
-    window.location.hash = "#home";
+    onExit();
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {/* Header Panel */}
       <div
         className="glass-panel"
         style={{
-          padding: "1.5rem 2rem",
+          padding: "1.25rem 2rem",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -235,17 +256,58 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
               color: "rgba(45,38,33,0.5)",
             }}
           >
-            Aktif di
+            Active in
           </span>
-          <h2
-            style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800 }}
-            className="text-gradient"
-          >
-            {roomId}
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <h2
+              style={{ margin: 0, fontSize: "1.5rem", fontWeight: 800 }}
+              className="text-gradient"
+            >
+              {showRoomId ? roomId : "••••••••"}
+            </h2>
+            <button
+              onClick={() => setShowRoomId(!showRoomId)}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#78716c",
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "0.2rem",
+                fontSize: "0.9rem",
+              }}
+              title={showRoomId ? "Hide Room ID" : "Show Room ID"}
+            >
+              {showRoomId ? <FaEyeSlash /> : <FaEye />}
+            </button>
+            <button
+              onClick={() => copyToClipboard(roomId, "Room ID")}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: "#78716c",
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "0.2rem",
+                fontSize: "0.9rem",
+              }}
+              title="Copy Room ID"
+            >
+              <FaCopy />
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: "2rem", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "1.5rem",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <div style={{ textAlign: "right" }}>
             <span
               style={{
@@ -256,16 +318,57 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
             >
               SECRET KEY
             </span>
-            <code
+            <div
               style={{
-                fontSize: "1rem",
-                color: "#c2410c",
-                fontWeight: 700,
-                fontFamily: "monospace",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                justifyContent: "flex-end",
               }}
             >
-              {secretKey}
-            </code>
+              <code
+                style={{
+                  fontSize: "1rem",
+                  color: "#c2410c",
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                }}
+              >
+                {showSecretKey ? secretKey : "••••••••"}
+              </code>
+              <button
+                onClick={() => setShowSecretKey(!showSecretKey)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#78716c",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "0.1rem",
+                  fontSize: "0.85rem",
+                }}
+                title={showSecretKey ? "Hide Secret Key" : "Show Secret Key"}
+              >
+                {showSecretKey ? <FaEyeSlash /> : <FaEye />}
+              </button>
+              <button
+                onClick={() => copyToClipboard(secretKey, "Secret Key")}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#78716c",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "0.1rem",
+                  fontSize: "0.85rem",
+                }}
+                title="Copy Secret Key"
+              >
+                <FaCopy />
+              </button>
+            </div>
           </div>
 
           <div style={{ textAlign: "right" }}>
@@ -297,84 +400,489 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
               background: "rgba(239, 68, 68, 0.08)",
               color: "#ef4444",
               border: "1px solid rgba(239, 68, 68, 0.15)",
+              padding: "0.65rem 1rem",
             }}
           >
-            Keluar
+            Exit
           </button>
         </div>
       </div>
 
-      {/* Tab Switcher */}
-      <div
-        style={{
-          display: "flex",
-          gap: "0.5rem",
-          borderBottom: "1px solid rgba(139,115,91,0.15)",
-          paddingBottom: "0.5rem",
-        }}
-      >
+      {/* Button Row Above the Map */}
+      <div style={{ display: "flex", justifyContent: "flex-start" }}>
         <button
-          className={`tab-btn ${activeTab === "kasir" ? "active" : ""}`}
-          onClick={() => setActiveTab("kasir")}
-          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
+          onClick={() => setShowCashierModal(true)}
+          className="btn-primary"
+          style={{
+            padding: "0.75rem 1.5rem",
+            fontSize: "0.95rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            boxShadow: "0 4px 12px rgba(234,88,12,0.18)",
+          }}
         >
-          <FaShoppingCart /> Kasir Dashboard
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "dapur" ? "active" : ""}`}
-          onClick={() => setActiveTab("dapur")}
-          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
-        >
-          <FaUtensils /> Dapur (Kitchen Kanban)
-        </button>
-        <button
-          className={`tab-btn ${activeTab === "pelanggan" ? "active" : ""}`}
-          onClick={() => setActiveTab("pelanggan")}
-          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
-        >
-          <FaUsers /> Layar Pelanggan (Status)
+          <FaShoppingCart /> + Place New Order
         </button>
       </div>
 
-      {/* Culinary Flow System */}
-      <CulinaryFlowSystem orders={orders} />
+      {/* Culinary Room Flow Map */}
+      <CulinaryFlowSystem orders={orders} onUpdateStatus={handleUpdateStatus} />
 
-      {/* Tab Contents */}
-      <div>
-        {activeTab === "kasir" && (
+      {/* Kitchen Kanban Board (Dapur) */}
+      <div
+        className="glass-panel"
+        style={{
+          padding: "1.5rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "1rem",
+          marginTop: "1.5rem",
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: "1.1rem",
+            color: "#431a03",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem",
+          }}
+        >
+          <FaUtensils /> Kitchen
+        </h3>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: "1rem",
+            minHeight: "380px",
+          }}
+        >
+          {/* Waiting Column */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "2rem",
-              flexWrap: "wrap",
+              background: "rgba(245, 158, 11, 0.02)",
+              padding: "1rem",
+              borderRadius: "10px",
+              border: "1px dashed rgba(245,158,11,0.2)",
             }}
           >
-            {/* Cashier input form */}
             <div
-              className="glass-panel"
               style={{
-                padding: "2rem",
                 display: "flex",
-                flexDirection: "column",
-                gap: "1.5rem",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                borderBottom: "1px solid rgba(245,158,11,0.2)",
+                paddingBottom: "0.35rem",
               }}
             >
-              <h3 style={{ margin: 0, color: "#431a03" }}>
-                Input Pesanan Baru
+              <span
+                style={{
+                  fontWeight: 800,
+                  color: "#b45309",
+                  fontSize: "0.8rem",
+                }}
+              >
+                WAITING
+              </span>
+              <span className="badge badge-waiting">
+                {orders.filter((o) => o.status === "waiting").length}
+              </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                maxHeight: "300px",
+                overflowY: "auto",
+              }}
+            >
+              {orders
+                .filter((o) => o.status === "waiting")
+                .map((order) => (
+                  <div
+                    key={order.orderId}
+                    className="glass-panel"
+                    style={{
+                      padding: "0.75rem",
+                      background: "#ffffff",
+                      border: "1px solid #e7dfd5",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "0.5rem",
+                        fontWeight: 800,
+                      }}
+                    >
+                      <span style={{ color: "#ea580c" }}>#{order.orderId}</span>
+                      <span style={{ color: "#b45309" }}>
+                        Table {order.tableNumber}
+                      </span>
+                    </div>
+                    <ul
+                      style={{
+                        margin: "0 0 0.75rem 0",
+                        paddingLeft: "1.1rem",
+                        color: "#2d2621",
+                      }}
+                    >
+                      {order.items.map((it, idx) => (
+                        <li key={idx}>
+                          {it.name}{" "}
+                          <span style={{ color: "#ea580c", fontWeight: 700 }}>
+                            x{it.quantity}
+                          </span>
+                          {it.notes && (
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "rgba(45,38,33,0.5)",
+                                display: "block",
+                              }}
+                            >
+                              * {it.notes}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      className="btn-primary"
+                      style={{
+                        padding: "0.4rem",
+                        width: "100%",
+                        fontSize: "0.8rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.25rem",
+                      }}
+                      onClick={() =>
+                        handleUpdateStatus(order.orderId, "waiting")
+                      }
+                    >
+                      <FaFire /> Cook
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Cooking Column */}
+          <div
+            style={{
+              background: "rgba(234, 88, 12, 0.02)",
+              padding: "1rem",
+              borderRadius: "10px",
+              border: "1px dashed rgba(234,88,12,0.2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                borderBottom: "1px solid rgba(234,88,12,0.2)",
+                paddingBottom: "0.35rem",
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 800,
+                  color: "#c2410c",
+                  fontSize: "0.8rem",
+                }}
+              >
+                COOKING
+              </span>
+              <span className="badge badge-cooking">
+                {orders.filter((o) => o.status === "cooking").length}
+              </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                maxHeight: "300px",
+                overflowY: "auto",
+              }}
+            >
+              {orders
+                .filter((o) => o.status === "cooking")
+                .map((order) => (
+                  <div
+                    key={order.orderId}
+                    className="glass-panel"
+                    style={{
+                      padding: "0.75rem",
+                      background: "#ffffff",
+                      border: "1px solid #e7dfd5",
+                      fontSize: "0.85rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "0.5rem",
+                        fontWeight: 800,
+                      }}
+                    >
+                      <span style={{ color: "#ea580c" }}>#{order.orderId}</span>
+                      <span style={{ color: "#c2410c" }}>
+                        Table {order.tableNumber}
+                      </span>
+                    </div>
+                    <ul
+                      style={{
+                        margin: "0 0 0.75rem 0",
+                        paddingLeft: "1.1rem",
+                        color: "#2d2621",
+                      }}
+                    >
+                      {order.items.map((it, idx) => (
+                        <li key={idx}>
+                          {it.name}{" "}
+                          <span style={{ color: "#ea580c", fontWeight: 700 }}>
+                            x{it.quantity}
+                          </span>
+                          {it.notes && (
+                            <span
+                              style={{
+                                fontSize: "0.75rem",
+                                color: "rgba(45,38,33,0.5)",
+                                display: "block",
+                              }}
+                            >
+                              * {it.notes}
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      className="btn-primary"
+                      style={{
+                        padding: "0.4rem",
+                        width: "100%",
+                        fontSize: "0.8rem",
+                        background:
+                          "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        boxShadow: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "0.25rem",
+                      }}
+                      onClick={() =>
+                        handleUpdateStatus(order.orderId, "cooking")
+                      }
+                    >
+                      <FaCheck /> Serve
+                    </button>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Done Column */}
+          <div
+            style={{
+              background: "rgba(16, 185, 129, 0.02)",
+              padding: "1rem",
+              borderRadius: "10px",
+              border: "1px dashed rgba(16,185,129,0.2)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                borderBottom: "1px solid rgba(16,185,129,0.2)",
+                paddingBottom: "0.35rem",
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 800,
+                  color: "#15803d",
+                  fontSize: "0.8rem",
+                }}
+              >
+                DONE
+              </span>
+              <span className="badge badge-done">
+                {orders.filter((o) => o.status === "done").length}
+              </span>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                maxHeight: "300px",
+                overflowY: "auto",
+              }}
+            >
+              {orders
+                .filter((o) => o.status === "done")
+                .map((order) => (
+                  <div
+                    key={order.orderId}
+                    className="glass-panel"
+                    style={{
+                      padding: "0.75rem",
+                      background: "#ffffff",
+                      border: "1px solid #e7dfd5",
+                      opacity: 0.8,
+                      fontSize: "0.82rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        marginBottom: "0.25rem",
+                        fontWeight: 800,
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: "#15803d",
+                          textDecoration: "line-through",
+                        }}
+                      >
+                        #{order.orderId}
+                      </span>
+                      <span style={{ color: "#15803d" }}>
+                        Table {order.tableNumber}
+                      </span>
+                    </div>
+                    <ul
+                      style={{
+                        margin: 0,
+                        paddingLeft: "1.1rem",
+                        color: "rgba(45, 38, 33, 0.7)",
+                      }}
+                    >
+                      {order.items.map((it, idx) => (
+                        <li key={idx}>
+                          {it.name} x{it.quantity}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* POPUP MODAL: Cashier Form */}
+      {showCashierModal && (
+        <div
+          onClick={() => setShowCashierModal(false)} // Close when clicking outer backdrop
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(45, 38, 33, 0.4)",
+            backdropFilter: "blur(5px)",
+            WebkitBackdropFilter: "blur(5px)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "1rem",
+          }}
+        >
+          <div
+            className="glass-panel food-box-anim"
+            onClick={(e) => e.stopPropagation()} // Prevent click inside modal card from closing
+            style={{
+              background: "#ffffff",
+              padding: "2rem",
+              maxWidth: "850px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "1.5rem",
+              position: "relative",
+              boxShadow: "0 20px 45px rgba(139, 115, 91, 0.2)",
+            }}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowCashierModal(false)}
+              style={{
+                position: "absolute",
+                top: "1rem",
+                right: "1rem",
+                background: "transparent",
+                border: "none",
+                fontSize: "1.2rem",
+                cursor: "pointer",
+                color: "#78716c",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <FaTimes />
+            </button>
+
+            {/* Left Modal Column: Forms */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1.25rem",
+              }}
+            >
+              <h3
+                style={{
+                  margin: 0,
+                  color: "#431a03",
+                  fontSize: "1.25rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                }}
+              >
+                <FaShoppingCart /> Place New Order
               </h3>
 
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.5rem",
+                  gap: "0.35rem",
                 }}
               >
                 <label
-                  style={{ fontSize: "0.9rem", color: "rgba(45,38,33,0.7)" }}
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "rgba(45,38,33,0.8)",
+                  }}
                 >
-                  Nomor Meja
+                  Table Number
                 </label>
                 <input
                   type="number"
@@ -384,7 +892,7 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                   onChange={(e) =>
                     setTableNumber(parseInt(e.target.value) || 1)
                   }
-                  style={{ width: "100px" }}
+                  style={{ width: "90px", padding: "0.5rem" }}
                 />
               </div>
 
@@ -393,26 +901,31 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.5rem",
+                  gap: "0.35rem",
                 }}
               >
                 <label
-                  style={{ fontSize: "0.9rem", color: "rgba(45,38,33,0.7)" }}
+                  style={{
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    color: "rgba(45,38,33,0.8)",
+                  }}
                 >
-                  Menu Cepat (Klik untuk menambah)
+                  Quick Preset Menu (Click to add)
                 </label>
                 <div
-                  style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}
+                  style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}
                 >
                   {PRESETS.map((p) => (
                     <button
                       key={p}
                       className="tab-btn"
                       style={{
-                        background: "#fdfbf7",
+                        background: "#faf6f0",
                         border: "1px solid #e7dfd5",
                         color: "#c2410c",
-                        fontSize: "0.85rem",
+                        fontSize: "0.8rem",
+                        padding: "0.5rem 0.8rem",
                       }}
                       onClick={() => addItemToOrder(p, 1, "")}
                     >
@@ -427,34 +940,35 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                 onSubmit={handleAddCustomItem}
                 style={{
                   borderTop: "1px solid #e7dfd5",
-                  paddingTop: "1.5rem",
+                  paddingTop: "1rem",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "1rem",
+                  gap: "0.75rem",
                 }}
               >
                 <span
                   style={{
-                    fontSize: "0.9rem",
+                    fontSize: "0.85rem",
                     fontWeight: 700,
                     color: "#431a03",
                   }}
                 >
-                  Tambah Custom Menu
+                  Add Custom Menu Item
                 </span>
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "2fr 1fr",
-                    gap: "0.5rem",
+                    gap: "0.4rem",
                   }}
                 >
                   <input
                     type="text"
-                    placeholder="Nama Menu..."
+                    placeholder="Item Name..."
                     className="form-input"
                     value={customItemName}
                     onChange={(e) => setCustomItemName(e.target.value)}
+                    style={{ padding: "0.5rem" }}
                   />
                   <input
                     type="number"
@@ -464,15 +978,17 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                     onChange={(e) =>
                       setCustomItemQty(parseInt(e.target.value) || 1)
                     }
+                    style={{ padding: "0.5rem" }}
                   />
                 </div>
                 <input
                   type="text"
-                  placeholder="Catatan (opsional, maks 200 karakter)..."
+                  placeholder="Notes (max 200 characters)..."
                   className="form-input"
                   value={customItemNotes}
                   onChange={(e) => setCustomItemNotes(e.target.value)}
                   maxLength={200}
+                  style={{ padding: "0.5rem" }}
                 />
                 <button
                   type="submit"
@@ -482,44 +998,53 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                     background: "#ffe8d6",
                     color: "#854d0e",
                     border: "1px solid rgba(234,88,12,0.2)",
+                    padding: "0.5rem 1rem",
+                    fontSize: "0.8rem",
                   }}
                 >
-                  Tambah ke Keranjang
+                  Add to Cart
                 </button>
               </form>
             </div>
 
-            {/* Shopping Cart / Order list */}
+            {/* Right Modal Column: Cart */}
             <div
-              className="glass-panel"
               style={{
-                padding: "2rem",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
+                borderLeft: "1px solid #e7dfd5",
+                paddingLeft: "1.5rem",
               }}
             >
               <div>
-                <h3 style={{ margin: "0 0 1.5rem 0", color: "#431a03" }}>
-                  Keranjang Pesanan (Meja {tableNumber})
+                <h3
+                  style={{
+                    margin: "0 0 1rem 0",
+                    fontSize: "1.15rem",
+                    color: "#431a03",
+                  }}
+                >
+                  Cart for Table {tableNumber}
                 </h3>
                 {orderItems.length === 0 ? (
                   <p
                     style={{
                       color: "rgba(45,38,33,0.5)",
                       textAlign: "center",
-                      padding: "2rem",
+                      padding: "3rem 0",
+                      fontSize: "0.9rem",
                     }}
                   >
-                    Keranjang kosong. Tambahkan menu terlebih dahulu.
+                    Cart is empty.
                   </p>
                 ) : (
                   <div
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      gap: "0.75rem",
-                      maxHeight: "350px",
+                      gap: "0.5rem",
+                      maxHeight: "280px",
                       overflowY: "auto",
                     }}
                   >
@@ -531,9 +1056,10 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                           justifyContent: "space-between",
                           alignItems: "center",
                           background: "#faf8f5",
-                          padding: "0.75rem 1rem",
-                          borderRadius: "8px",
+                          padding: "0.5rem 0.75rem",
+                          borderRadius: "6px",
                           border: "1px solid #e7dfd5",
+                          fontSize: "0.85rem",
                         }}
                       >
                         <div>
@@ -542,7 +1068,7 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                             style={{
                               color: "#ea580c",
                               fontWeight: 700,
-                              marginLeft: "0.5rem",
+                              marginLeft: "0.35rem",
                             }}
                           >
                             x{item.quantity}
@@ -550,15 +1076,12 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                           {item.notes && (
                             <p
                               style={{
-                                margin: "0.25rem 0 0 0",
-                                fontSize: "0.8rem",
+                                margin: "0.15rem 0 0 0",
+                                fontSize: "0.75rem",
                                 color: "rgba(45,38,33,0.5)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.25rem",
                               }}
                             >
-                              <FaRegFileAlt /> {item.notes}
+                              📝 {item.notes}
                             </p>
                           )}
                         </div>
@@ -569,7 +1092,7 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
                             border: "none",
                             color: "#ef4444",
                             cursor: "pointer",
-                            fontSize: "1rem",
+                            fontSize: "0.9rem",
                             display: "flex",
                             alignItems: "center",
                           }}
@@ -585,549 +1108,22 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
               <button
                 className="btn-primary"
                 style={{
-                  padding: "1rem",
+                  padding: "0.85rem",
                   width: "100%",
-                  fontSize: "1.1rem",
-                  marginTop: "2rem",
+                  fontSize: "1rem",
+                  marginTop: "1.5rem",
                 }}
                 onClick={handleSubmitOrder}
                 disabled={orderItems.length === 0}
               >
-                Kirim Pesanan ke Dapur
+                Send Order to Kitchen
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {activeTab === "dapur" && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: "1.5rem",
-              minHeight: "500px",
-            }}
-          >
-            {/* Waiting Column */}
-            <div
-              className="glass-panel"
-              style={{
-                padding: "1.5rem",
-                background: "rgba(245, 158, 11, 0.03)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "1.5rem",
-                  borderBottom: "1px solid rgba(245,158,11,0.3)",
-                  paddingBottom: "0.5rem",
-                }}
-              >
-                <h4 style={{ margin: 0, color: "#b45309" }}>WAITING</h4>
-                <span className="badge badge-waiting">
-                  {orders.filter((o) => o.status === "waiting").length}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1rem",
-                }}
-              >
-                {orders
-                  .filter((o) => o.status === "waiting")
-                  .map((order) => (
-                    <div
-                      key={order.orderId}
-                      className="glass-panel"
-                      style={{
-                        padding: "1rem",
-                        background: "#ffffff",
-                        border: "1px solid #e7dfd5",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        <span style={{ fontWeight: 800, color: "#ea580c" }}>
-                          #{order.orderId}
-                        </span>
-                        <span style={{ color: "#b45309", fontWeight: 700 }}>
-                          Meja {order.tableNumber}
-                        </span>
-                      </div>
-                      <ul
-                        style={{
-                          margin: "0 0 1rem 0",
-                          paddingLeft: "1.25rem",
-                          fontSize: "0.9rem",
-                          color: "#2d2621",
-                        }}
-                      >
-                        {order.items.map((it, idx) => (
-                          <li key={idx}>
-                            <strong style={{ fontWeight: 600 }}>
-                              {it.name}
-                            </strong>{" "}
-                            <span style={{ color: "#ea580c", fontWeight: 700 }}>
-                              x{it.quantity}
-                            </span>
-                            {it.notes && (
-                              <span
-                                style={{
-                                  fontSize: "0.8rem",
-                                  color: "rgba(45,38,33,0.5)",
-                                  display: "block",
-                                }}
-                              >
-                                * {it.notes}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        className="btn-primary"
-                        style={{
-                          padding: "0.5rem",
-                          width: "100%",
-                          fontSize: "0.85rem",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "0.4rem",
-                        }}
-                        onClick={() =>
-                          handleUpdateStatus(order.orderId, "waiting")
-                        }
-                      >
-                        <FaFire /> Mulai Masak
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            {/* Cooking Column */}
-            <div
-              className="glass-panel"
-              style={{
-                padding: "1.5rem",
-                background: "rgba(234, 88, 12, 0.03)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "1.5rem",
-                  borderBottom: "1px solid rgba(234,88,12,0.3)",
-                  paddingBottom: "0.5rem",
-                }}
-              >
-                <h4 style={{ margin: 0, color: "#c2410c" }}>COOKING</h4>
-                <span className="badge badge-cooking">
-                  {orders.filter((o) => o.status === "cooking").length}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1rem",
-                }}
-              >
-                {orders
-                  .filter((o) => o.status === "cooking")
-                  .map((order) => (
-                    <div
-                      key={order.orderId}
-                      className="glass-panel"
-                      style={{
-                        padding: "1rem",
-                        background: "#ffffff",
-                        border: "1px solid #e7dfd5",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: "0.75rem",
-                        }}
-                      >
-                        <span style={{ fontWeight: 800, color: "#ea580c" }}>
-                          #{order.orderId}
-                        </span>
-                        <span style={{ color: "#c2410c", fontWeight: 700 }}>
-                          Meja {order.tableNumber}
-                        </span>
-                      </div>
-                      <ul
-                        style={{
-                          margin: "0 0 1rem 0",
-                          paddingLeft: "1.25rem",
-                          fontSize: "0.9rem",
-                          color: "#2d2621",
-                        }}
-                      >
-                        {order.items.map((it, idx) => (
-                          <li key={idx}>
-                            <strong style={{ fontWeight: 600 }}>
-                              {it.name}
-                            </strong>{" "}
-                            <span style={{ color: "#ea580c", fontWeight: 700 }}>
-                              x{it.quantity}
-                            </span>
-                            {it.notes && (
-                              <span
-                                style={{
-                                  fontSize: "0.8rem",
-                                  color: "rgba(45,38,33,0.5)",
-                                  display: "block",
-                                }}
-                              >
-                                * {it.notes}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                      <button
-                        className="btn-primary"
-                        style={{
-                          padding: "0.5rem",
-                          width: "100%",
-                          fontSize: "0.85rem",
-                          background:
-                            "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                          boxShadow: "0 4px 14px rgba(16, 185, 129, 0.2)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "0.4rem",
-                        }}
-                        onClick={() =>
-                          handleUpdateStatus(order.orderId, "cooking")
-                        }
-                      >
-                        <FaCheck /> Selesai Masak
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-
-            {/* Done Column */}
-            <div
-              className="glass-panel"
-              style={{
-                padding: "1.5rem",
-                background: "rgba(16, 185, 129, 0.03)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "1.5rem",
-                  borderBottom: "1px solid rgba(16,185,129,0.3)",
-                  paddingBottom: "0.5rem",
-                }}
-              >
-                <h4 style={{ margin: 0, color: "#15803d" }}>DONE</h4>
-                <span className="badge badge-done">
-                  {orders.filter((o) => o.status === "done").length}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1rem",
-                }}
-              >
-                {orders
-                  .filter((o) => o.status === "done")
-                  .map((order) => (
-                    <div
-                      key={order.orderId}
-                      className="glass-panel"
-                      style={{
-                        padding: "1rem",
-                        background: "#ffffff",
-                        border: "1px solid #e7dfd5",
-                        opacity: 0.9,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: "0.5rem",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontWeight: 800,
-                            color: "#15803d",
-                            textDecoration: "line-through",
-                          }}
-                        >
-                          #{order.orderId}
-                        </span>
-                        <span style={{ color: "#15803d", fontWeight: 700 }}>
-                          Meja {order.tableNumber}
-                        </span>
-                      </div>
-                      <ul
-                        style={{
-                          margin: 0,
-                          paddingLeft: "1.25rem",
-                          fontSize: "0.85rem",
-                          color: "rgba(45, 38, 33, 0.7)",
-                        }}
-                      >
-                        {order.items.map((it, idx) => (
-                          <li key={idx}>
-                            {it.name} x{it.quantity}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === "pelanggan" && (
-          <div
-            className="glass-panel"
-            style={{ padding: "3rem", textAlign: "center" }}
-          >
-            <h3
-              style={{
-                fontSize: "1.75rem",
-                marginBottom: "2rem",
-                color: "#431a03",
-              }}
-              className="text-gradient"
-            >
-              Status Pesanan Meja
-            </h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
-                gap: "2rem",
-                textAlign: "left",
-              }}
-            >
-              {/* Waiting Section */}
-              <div
-                className="glass-panel"
-                style={{
-                  padding: "2rem",
-                  minHeight: "300px",
-                  background: "#ffffff",
-                }}
-              >
-                <h4
-                  style={{
-                    borderBottom: "1px solid rgba(245,158,11,0.3)",
-                    paddingBottom: "0.75rem",
-                    margin: "0 0 1.5rem 0",
-                    color: "#b45309",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>Antri (Waiting)</span>
-                  <span
-                    style={{
-                      animation: "pulse 1.5s infinite",
-                      color: "#f59e0b",
-                      fontSize: "1rem",
-                      display: "inline-flex",
-                    }}
-                  >
-                    <FaClock />
-                  </span>
-                </h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-                  {orders
-                    .filter((o) => o.status === "waiting")
-                    .map((o) => (
-                      <div
-                        key={o.orderId}
-                        style={{
-                          background: "#fffbeb",
-                          border: "1px solid rgba(217, 119, 6, 0.2)",
-                          color: "#b45309",
-                          padding: "1rem 1.5rem",
-                          borderRadius: "10px",
-                          fontSize: "1.2rem",
-                          fontWeight: 800,
-                          textAlign: "center",
-                          minWidth: "80px",
-                        }}
-                      >
-                        M-{o.tableNumber}
-                        <span
-                          style={{
-                            display: "block",
-                            fontSize: "0.7rem",
-                            fontWeight: 400,
-                            color: "rgba(45, 38, 33, 0.5)",
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          #{o.orderId}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {/* Cooking Section */}
-              <div
-                className="glass-panel"
-                style={{
-                  padding: "2rem",
-                  minHeight: "300px",
-                  background: "#ffffff",
-                }}
-              >
-                <h4
-                  style={{
-                    borderBottom: "1px solid rgba(234,88,12,0.3)",
-                    paddingBottom: "0.75rem",
-                    margin: "0 0 1.5rem 0",
-                    color: "#c2410c",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>Dimasak (Cooking)</span>
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      animation: "spin 4s linear infinite",
-                      color: "#ea580c",
-                      fontSize: "1rem",
-                    }}
-                  >
-                    <FaCog />
-                  </span>
-                </h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-                  {orders
-                    .filter((o) => o.status === "cooking")
-                    .map((o) => (
-                      <div
-                        key={o.orderId}
-                        style={{
-                          background: "#fff7ed",
-                          border: "1px solid rgba(234, 88, 12, 0.2)",
-                          color: "#c2410c",
-                          padding: "1rem 1.5rem",
-                          borderRadius: "10px",
-                          fontSize: "1.2rem",
-                          fontWeight: 800,
-                          textAlign: "center",
-                          minWidth: "80px",
-                        }}
-                      >
-                        M-{o.tableNumber}
-                        <span
-                          style={{
-                            display: "block",
-                            fontSize: "0.7rem",
-                            fontWeight: 400,
-                            color: "rgba(45, 38, 33, 0.5)",
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          #{o.orderId}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {/* Done Section */}
-              <div
-                className="glass-panel"
-                style={{
-                  padding: "2rem",
-                  minHeight: "300px",
-                  background: "#ffffff",
-                }}
-              >
-                <h4
-                  style={{
-                    borderBottom: "1px solid rgba(16,185,129,0.3)",
-                    paddingBottom: "0.75rem",
-                    margin: "0 0 1.5rem 0",
-                    color: "#15803d",
-                  }}
-                >
-                  Siap Saji (Done)
-                </h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-                  {orders
-                    .filter((o) => o.status === "done")
-                    .map((o) => (
-                      <div
-                        key={o.orderId}
-                        style={{
-                          background: "#f0fdf4",
-                          border: "1px solid rgba(22, 163, 74, 0.2)",
-                          color: "#15803d",
-                          padding: "1rem 1.5rem",
-                          borderRadius: "10px",
-                          fontSize: "1.2rem",
-                          fontWeight: 800,
-                          textAlign: "center",
-                          minWidth: "80px",
-                          animation: "bounce 2s infinite",
-                        }}
-                      >
-                        M-{o.tableNumber}
-                        <span
-                          style={{
-                            display: "block",
-                            fontSize: "0.7rem",
-                            fontWeight: 400,
-                            color: "rgba(22, 163, 74, 0.6)",
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          Selesai
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Embedded Animations */}
+      {/* Embedded style tweaks */}
       <style>{`
         @keyframes pulse {
           0% { opacity: 0.3; }
@@ -1136,10 +1132,6 @@ export const RoomView: React.FC<RoomViewProps> = ({ roomId, addToast }) => {
         }
         @keyframes spin {
           100% { transform: rotate(360deg); }
-        }
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-5px); }
         }
       `}</style>
     </div>

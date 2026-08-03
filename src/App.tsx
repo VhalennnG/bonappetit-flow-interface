@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { HomeView } from './views/HomeView';
-import { RoomView } from './views/RoomView';
+import { useState, useEffect } from "react";
+import { HomeView } from "./views/HomeView";
+import { RoomView } from "./views/RoomView";
 
 interface Toast {
   id: number;
@@ -8,17 +8,25 @@ interface Toast {
 }
 
 function App() {
-  const [route, setRoute] = useState<string>(window.location.hash || '#home');
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // Simple Hash Router
+  // Check sessionStorage on load to maintain session across reloads
   useEffect(() => {
-    const handleHashChange = () => {
-      setRoute(window.location.hash || '#home');
-    };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    const savedRoomId = sessionStorage.getItem("activeRoomId");
+    const savedSecretKey = sessionStorage.getItem("secretKey");
+    if (savedRoomId && savedSecretKey) {
+      activeRoomIdVal(savedRoomId);
+    }
+    // Clean hash route from URL to avoid confusion
+    if (window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
+
+  const activeRoomIdVal = (roomId: string | null) => {
+    setActiveRoomId(roomId);
+  };
 
   // Toast notification manager
   const addToast = (message: string) => {
@@ -29,20 +37,31 @@ function App() {
     }, 4000);
   };
 
-  // Route resolver
-  const renderRoute = () => {
-    if (route.startsWith('#room/')) {
-      const roomId = route.replace('#room/', '');
-      return <RoomView roomId={roomId} addToast={addToast} />;
-    }
-    return <HomeView addToast={addToast} />;
+  const handleJoinRoom = (roomId: string, secretKey: string) => {
+    sessionStorage.setItem("activeRoomId", roomId);
+    sessionStorage.setItem("secretKey", secretKey);
+    activeRoomIdVal(roomId);
+  };
+
+  const handleExitRoom = () => {
+    sessionStorage.removeItem("activeRoomId");
+    sessionStorage.removeItem("secretKey");
+    activeRoomIdVal(null);
   };
 
   return (
     <div>
       {/* Main Content Area */}
-      <main style={{ minHeight: '85vh', paddingBottom: '3rem' }}>
-        {renderRoute()}
+      <main style={{ minHeight: "85vh", paddingBottom: "3rem" }}>
+        {activeRoomId ? (
+          <RoomView
+            roomId={activeRoomId}
+            addToast={addToast}
+            onExit={handleExitRoom}
+          />
+        ) : (
+          <HomeView addToast={addToast} onJoinRoom={handleJoinRoom} />
+        )}
       </main>
 
       {/* Floating Toasts container */}
