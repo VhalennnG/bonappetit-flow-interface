@@ -34,7 +34,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
 
     setCreateLoading(true);
     try {
-      const response = await fetch("/rooms", {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/rooms`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -83,7 +83,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ addToast, onJoinRoom }) => {
 
     setJoinLoading(true);
     try {
-      const response = await fetch(`/rooms/${cleanRoomId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/rooms/${cleanRoomId}`, {
         method: "GET",
         headers: {
           "X-Device-Key": cleanSecretKey,

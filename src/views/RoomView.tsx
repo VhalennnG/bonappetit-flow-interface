@@ -61,7 +61,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
   // 1. Verify Room and fetch orders
   const fetchRoomAndOrders = async () => {
     try {
-      const roomRes = await fetch(`/rooms/${roomId}`, {
+      const roomRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/rooms/${roomId}`, {
         headers: {
           "X-Device-Key": secretKey,
         },
@@ -79,7 +79,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       const roomData = await roomRes.json();
       setExpiresAt(roomData.expiresAt);
 
-      const ordersRes = await fetch(`/rooms/${roomId}/orders`, {
+      const ordersRes = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/rooms/${roomId}/orders`, {
         headers: {
           "X-Device-Key": secretKey,
         },
@@ -168,7 +168,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
     }
 
     try {
-      const response = await fetch(`/rooms/${roomId}/orders`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/rooms/${roomId}/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -207,7 +207,7 @@ export const RoomView: React.FC<RoomViewProps> = ({
       currentStatus === "waiting" ? "cooking" : "done";
 
     try {
-      const response = await fetch(`/rooms/${roomId}/orders/${orderId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/rooms/${roomId}/orders/${orderId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
