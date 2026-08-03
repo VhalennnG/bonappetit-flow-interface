@@ -1,32 +1,71 @@
-# React + TypeScript + Vite
+# Bon appétit Flow Frontend 🎨
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The frontend of **Bon appétit Flow** is a high-fidelity dashboard built with **React**, **TypeScript**, and **Vite**, featuring interactive animations and state-driven pairing.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Tech Stack & Dependencies
 
-## React Compiler
+* **Framework:** React 18
+* **Build System:** Vite + TypeScript
+* **Icons:** `react-icons` (FontAwesome, Material Design)
+* **Styling:** Custom CSS with Warm Culinary Accents (`index.css`)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## 🌟 Key Architecture & Features
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+### 1. State-Based Session Hiding
+Unlike traditional apps, there are no `#room/...` route tokens in the address bar. The URL remains strictly clean (`http://localhost:5173/`).
+* The **Room ID** and **Secret Key** are managed entirely in React state.
+* The session details are mirrored to `sessionStorage` so that the room remains active and synchronized upon page refresh.
+* Leaving or exiting the room clears the `sessionStorage` and returns the user to the landing page.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+### 2. Chrome-Style Navigation Tabs
+The landing page features custom-designed Chrome-style tabs dividing the views into **Create Room** (pre-populated with a unique key) and **Join Room** (which accepts a Room ID and Secret Key pair for multiple terminals).
+
+### 3. Interactive Restaurant Floor Plan (`CulinaryFlowSystem.tsx`)
+Renders a visual spatial representation of the restaurant workflow:
+* **Queue Board:** Clickable order tickets currently in line.
+* **Cooking Stoves:** Active stoves showing flame and steam animations when cooking is underway. Clicking on active stoves lets chefs advance progress directly.
+* **Waiter Corridor:** Wooden hallway that displays waiter sprites moving across the screen for 2.5 seconds when an order transitions from `cooking` to `done`.
+* **Dining Tables Area:** Displays dishes that have successfully landed at customer tables.
+
+---
+
+## ⚙️ Vite Proxy Configuration
+
+The React development server is pre-configured with a local proxy in `vite.config.ts` to redirect all `/rooms` API calls to the C++ server running on port `8080`:
+
+```typescript
+// vite.config.ts
+server: {
+  proxy: {
+    '/rooms': {
+      target: 'http://localhost:8080',
+      changeOrigin: true
+    }
   }
 }
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+---
+
+## 🚀 How to Run
+
+### Install Node Modules
+```bash
+npm install
+```
+
+### Launch Development Server
+```bash
+npm run dev
+```
+*Open `http://localhost:5173` to interact with the frontend.*
+
+### Build Production Bundle
+```bash
+npm run build
+```
+*Compiles the static build assets into the `dist/` directory.*
